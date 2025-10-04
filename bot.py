@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
@@ -74,17 +75,45 @@ class FaceAnalyzer:
             contents=contents,
             config=config,
         )
-        response_text = ""
-        for chunk in response_chunks:
-            if chunk.text:
-                response_text += chunk.text
+        response_text = self._collect_response_text(response_chunks)
         LOGGER.debug("Gemini response: %s", response_text)
         try:
-            parsed = json.loads(response_text)
-        except json.JSONDecodeError as exc:
+            parsed = self._parse_json_response(response_text)
+        except ValueError as exc:
             LOGGER.exception("Failed to parse Gemini response as JSON")
             raise RuntimeError("Не удалось распознать ответ модели") from exc
         return parsed
+
+    def _collect_response_text(self, response_chunks: Any) -> str:
+        parts: List[str] = []
+        for chunk in response_chunks:
+            chunk_text = getattr(chunk, "text", None)
+            if chunk_text:
+                parts.append(chunk_text)
+            candidates = getattr(chunk, "candidates", None)
+            if candidates:
+                for candidate in candidates:
+                    content = getattr(candidate, "content", None)
+                    if content and getattr(content, "parts", None):
+                        for part in content.parts:
+                            part_text = getattr(part, "text", None)
+                            if part_text:
+                                parts.append(part_text)
+            error = getattr(chunk, "error", None)
+            if error:
+                raise RuntimeError(f"Gemini API error: {error}")
+        return "".join(parts).strip()
+
+    def _parse_json_response(self, response_text: str) -> Dict[str, Any]:
+        if not response_text:
+            raise ValueError("Empty response")
+        try:
+            return json.loads(response_text)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", response_text, re.DOTALL)
+            if not match:
+                raise ValueError("No JSON object found in response")
+            return json.loads(match.group())
 
 
 def load_font(size: int) -> ImageFont.ImageFont:
