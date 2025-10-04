@@ -8,12 +8,19 @@ from dataclasses import dataclass
 from typing import Any, Dict, List
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from telegram import InputFile, Update
 from telegram.constants import ChatAction, ParseMode
-from telegram.ext import (Application, ApplicationBuilder, CommandHandler,
-                          ContextTypes, MessageHandler, filters)
+from telegram.ext import (
+    Application,
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -248,6 +255,7 @@ async def analyze_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
+    load_dotenv()
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
         raise ValueError("TELEGRAM_BOT_TOKEN is not set")
